@@ -1,1 +1,121 @@
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-app.js";
+import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-auth.js";
+import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-firestore.js";
+import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/12.9.0/firebase-storage.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC4DdtJz-u3wBnP39aY61h-LcZcb-2lHkc",
+  authDomain: "tdele-8e7b9.firebaseapp.com",
+  projectId: "tdele-8e7b9",
+  storageBucket: "tdele-8e7b9.appspot.com",
+  messagingSenderId: "144290683842",
+  appId: "1:144290683842:web:0b0469105d7ffcae20d45b"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// --- Registrer ny bruger ---
+window.register = async function() {
+  const username = prompt("Indtast brugernavn");
+  const email = prompt("Indtast email");
+  const password = prompt("Indtast password");
+
+  try {
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    await updateProfile(userCredential.user, { displayName: username });
+    alert("Konto oprettet! Velkommen " + username);
+  } catch (error) {
+    alert("Fejl: " + error.message);
+  }
+}
+
+// --- Login ---
+window.login = async function() {
+  const email = prompt("Indtast email");
+  const password = prompt("Indtast password");
+
+  try {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    alert("Velkommen tilbage " + userCredential.user.displayName);
+  } catch (error) {
+    alert("Fejl: " + error.message);
+  }
+}
+
+// --- Logout ---
+window.logout = async function() {
+  try {
+    await signOut(auth);
+    alert("Du er logget ud!");
+  } catch (error) {
+    alert("Fejl: " + error.message);
+  }
+}
+
+// --- Tilføj annonce (kun hvis logget ind) ---
+window.addPost = async function() {
+  if (!auth.currentUser) {
+    alert("Du skal være logget ind for at oprette annonce!");
+    return;
+  }
+
+  const title = document.getElementById("title").value;
+  const price = document.getElementById("price").value;
+  const desc = document.getElementById("desc").value;
+  const file = document.getElementById("image").files[0];
+
+  let imageUrl = "";
+
+  if (file) {
+    const storageRef = ref(storage, "posts/" + Date.now() + "_" + file.name);
+    await uploadBytes(storageRef, file);
+    imageUrl = await getDownloadURL(storageRef);
+  }
+
+  await addDoc(collection(db, "posts"), {
+    title,
+    price,
+    desc,
+    imageUrl,
+    created: new Date(),
+    user: auth.currentUser.displayName
+  });
+
+  document.getElementById("title").value = "";
+  document.getElementById("price").value = "";
+  document.getElementById("desc").value = "";
+  document.getElementById("image").value = "";
+
+  loadPosts();
+}
+
+// --- Load annoncer ---
+async function loadPosts() {
+  const q = query(collection(db, "posts"), orderBy("created", "desc"));
+  const snapshot = await getDocs(q);
+  const postsDiv = document.getElementById("posts");
+  postsDiv.innerHTML = "";
+
+  snapshot.forEach(doc => {
+    const data = doc.data();
+    postsDiv.innerHTML += `
+      <div class="card">
+        ${data.imageUrl ? `<img src="${data.imageUrl}" class="post-img">` : ""}
+        <div class="card-content">
+          <h3>${data.title}</h3>
+          <p>${data.desc}</p>
+          <div class="price">${data.price} kr</div>
+          <div class="user">Oprettet af: ${data.user || "Ukendt"}</div>
+        </div>
+      </div>
+    `;
+  });
+}
+
+loadPosts();
+</script>
 
